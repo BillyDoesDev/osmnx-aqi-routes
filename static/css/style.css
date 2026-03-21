@@ -1,0 +1,17 @@
+* {
+    border: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    height: 100vh;
+    display: grid;
+    place-items: center;
+    background-color: black;
+}
+
+.map-container {
+    width: 90%;
+    max-width: 1200px;
+}
