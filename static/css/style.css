@@ -9,6 +9,7 @@ body {
     display: grid;
     place-items: center;
     background-color: black;
+    color: white;
 }
 
 .map-container {
