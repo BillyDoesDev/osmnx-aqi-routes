@@ -38,7 +38,7 @@ def generate_base_map():
     folium.GeoJson(
         geojson,
         name="Supported routing area",
-        tooltip="Supported routing area",
+        # tooltip="Supported routing area",
         style_function=lambda _: {
             "fillColor": "#4488ff",
             "fillOpacity": 0.08,

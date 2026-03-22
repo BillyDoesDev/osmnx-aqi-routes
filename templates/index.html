@@ -14,26 +14,22 @@
     <form id="route-form" action="/route" method="get">
         <div class="field">
             <label for="start">FROM</label>
+            <input id="start" name="start" type="text" placeholder="e.g. Patia Square" value="{{ start | default('') }}"
+                autocomplete="off" required />
             <div class="autocomplete-wrap">
-                <input id="start" name="start" type="text" placeholder="e.g. Patia Square"
-                    value="{{ start | default('') }}" autocomplete="off" required />
                 <ul class="suggestions" id="start-suggestions"></ul>
             </div>
         </div>
         <div class="field">
             <label for="end">TO</label>
+            <input id="end" name="end" type="text" placeholder="e.g. Kalinga Hospital" value="{{ end | default('') }}"
+                autocomplete="off" required />
             <div class="autocomplete-wrap">
-                <input id="end" name="end" type="text" placeholder="e.g. Kalinga Hospital"
-                    value="{{ end | default('') }}" autocomplete="off" required />
                 <ul class="suggestions" id="end-suggestions"></ul>
             </div>
         </div>
         <button type="submit" id="go-btn">
             <span>Find Route</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                    stroke-linejoin="round" />
-            </svg>
         </button>
     </form>
 

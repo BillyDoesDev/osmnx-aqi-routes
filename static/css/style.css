@@ -1,7 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
 * {
     border: 0;
     padding: 0;
     box-sizing: border-box;
+    transition: 0.2s;
+    font-family: "JetBrains Mono", monospace;
+    font-optical-sizing: auto;
+    font-style: normal;
 }
 
 body {
@@ -12,7 +18,90 @@ body {
     color: white;
 }
 
+input {
+    outline: none;
+    padding: 0.5rem;
+    border: 2px solid rgba(198, 198, 198, 0.475);
+    transition: 0.5s;
+    border-radius: 0.5rem;
+    background-color: black;
+    color: white;
+    height: 3rem;
+}
+
+input::placeholder {
+    color: gray;
+    opacity: 0.5;
+}
+
+input:focus {
+    border: 2px solid gray;
+}
+
+button {
+    cursor: pointer;
+    height: fit-content;
+    width: fit-content;
+    padding: 0.5rem;
+    border-radius: 0.3rem;
+    outline: none;
+    color: white;
+    background-color: #323b4a;
+}
+
+button:hover {
+    background-color: #465267;
+}
+
+ul {
+    list-style-type: none;
+}
+
+li {
+    padding-bottom: 0.5rem;
+    opacity: 0.5;
+    transition: 0.2s;
+}
+
+li:hover {
+    opacity: 1;
+    cursor: pointer;
+}
+
 .map-container {
     width: 90%;
     max-width: 1200px;
+    padding: 2rem;
+
+}
+
+#route-form {
+    display: grid;
+    row-gap: 0.7rem;
+    width: 50%;
+    min-width: 200px;
+    max-width: 600px;
+    padding: 2rem;
+}
+
+#route-form div.field {
+    display: grid;
+    row-gap: 1rem;
+    position: relative;
+}
+
+#route-form div.autocomplete-wrap {
+    z-index: 10;
+    overflow: scroll;
+    max-height: 9rem;
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.674);
+    border-radius: 0.5rem;
+    translate: 0 5rem;
+    backdrop-filter: blur(10px);
+}
+
+#route-form button {
+    margin-top: 1rem;
+    width: 100%;
 }
