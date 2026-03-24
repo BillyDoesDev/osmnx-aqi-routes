@@ -13,3 +13,4 @@ Services used so far:
 - fastapi: backend
 - osmnx: main routing engine + graph
 - folium: map rendering
+- OSRM API: shortest path directions

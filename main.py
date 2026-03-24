@@ -1,9 +1,9 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from services.graph_service import generate_base_map, get_boundary
+from services.graph_service import generate_base_map, get_boundary, generate_route_map
 import json
 import logging
 
@@ -54,3 +54,50 @@ async def get_bbox_bounds():
         "name": city.display_name.loc[0],
     }
     return JSONResponse(content=data)
+
+
+@app.get("/route", response_class=HTMLResponse)
+async def route(
+    request: Request,
+    start: str = Query(...),
+    end: str = Query(...),
+):
+    logging.debug(f"Got /route: {start}->{end}")
+    try:
+        m, steps, dist_km, time_min = generate_route_map(start, end)
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "map_html": m._repr_html_(),
+                "steps": steps,
+                "dist_km": dist_km,
+                "time_min": time_min,
+                "start": start,
+                "end": end,
+            },
+        )
+    except ValueError as e:
+        m = generate_base_map()
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "map_html": m._repr_html_(),
+                "error": str(e),
+                "start": start,
+                "end": end,
+            },
+        )
+    except Exception as e:
+        m = generate_base_map()
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "map_html": m._repr_html_(),
+                "error": f"Could not compute route: {e}",
+                "start": start,
+                "end": end,
+            },
+        )
