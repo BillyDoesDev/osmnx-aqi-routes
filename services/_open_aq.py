@@ -1,36 +1,63 @@
 # OpenAQ docs at: https://api.openaq.org/docs
 
 from datetime import datetime, timedelta
+import subprocess
 
 import osmnx as ox
 import requests
 from dotenv import load_dotenv
+from pydantic import BaseModel
 import os
+
 
 load_dotenv()
 
 OPENAQ_API_KEY = os.getenv("OPENAQ_API_KEY")
 CITY_OSMID = "R10108023"
 
+
+class SensorRef(BaseModel):
+    """Lightweight ref used in sensors_by_name lookup (name -> id + units)."""
+
+    id: int
+    units: str
+
+
+class StationSensor(BaseModel):
+    """A single sensor entry on a station (id -> display_name + units)."""
+
+    id: int
+    display_name: str
+    units: str
+
+
+class Station(BaseModel):
+    name: str
+    owner: str
+    bbox_bounds: list[float]  # [w, s, e, n]
+    sensors: dict[int, StationSensor]  # sensor_id -> StationSensor
+    sensors_by_name: dict[str, SensorRef]  # display_name -> SensorRef
+
+
+class CityAQI(BaseModel):
+    """Top-level object for a city - holds all its AQI stations."""
+
+    city_name: str
+    stations: dict[int, Station]  # station_id -> Station
+
+
+class Reading(BaseModel):
+    value: float
+    display_name: str
+    units: str
+    datetime: datetime
+
+
 # get our target city of choice, Bhubaneswar in our case
-city = ox.geocoder.geocode_to_gdf(CITY_OSMID, by_osmid=True)
-print(f"City name: {city.display_name.iloc[0]}")
-
-l_lat, l_lon = city.bbox_south.iloc[0], city.bbox_west.iloc[0]
-r_lat, r_lon = city.bbox_north.iloc[0], city.bbox_east.iloc[0]
-
-r = requests.get(
-    "https://api.openaq.org/v3/locations",
-    params={"bbox": ",".join(map(str, [l_lon, l_lat, r_lon, r_lat])), "limit": 1000},
-    headers={"X-API-Key": OPENAQ_API_KEY},
-)
-
-location_data = r.json()
-
 # NOTE: The analysis below takes a very simplistic approach and as a result,
-# a very limited amount of data into consideration, for representation and 
+# a very limited amount of data into consideration, for representation and
 # basic prediction/calculation purposes
-# a lot of the meta information is skipped via the various methods and viltering going on,
+# a lot of the meta information is skipped via the various methods and filtering going on,
 # but they can be added later on if needed (highly dubious xD)
 
 # location_data.keys() -> dict_keys(['meta', 'results'])
@@ -44,60 +71,87 @@ location_data = r.json()
 # 'id' is the station id
 # 'sensors' will give a list, each of whose elements is a dict with keys -> dict_keys(['id', 'name', 'parameter']). 'id' is the sensor id
 
-aqi_stations = location_data["results"]
-_aqi_stations = {} # station_id: {station details}
 
-for station in aqi_stations:
-    sensors = {}
-    sensors_by_name = {}
+def fetch_city_aqi(osmid: str) -> CityAQI:
+    """Fetch all AQI stations for a city by its OSM ID."""
+    city = ox.geocoder.geocode_to_gdf(osmid, by_osmid=True)
+    city_name = city.display_name.iloc[0]
+    print(f"City: {city_name}")
 
-    for sensor in station["sensors"]:
-        sensors[sensor["id"]] = {
-            "display_name": sensor["parameter"]["displayName"],
-            "units": sensor["parameter"]["units"],
-        }
-        sensors_by_name[sensor["parameter"]["displayName"]] = {
-            "id": sensor["id"],
-            "units": sensor["parameter"]["units"],
-        }
+    l_lat, l_lon = city.bbox_south.iloc[0], city.bbox_west.iloc[0]
+    r_lat, r_lon = city.bbox_north.iloc[0], city.bbox_east.iloc[0]
 
-    _aqi_stations[station["id"]] = {
-        "name": station["name"],
-        "owner": station["owner"]["name"],
-        "bbox_bounds": station["bounds"],
-        "sensors": sensors,
-        "sensors_by_name": sensors_by_name
-    }
+    results = requests.get(
+        "https://api.openaq.org/v3/locations",
+        params={
+            "bbox": ",".join(map(str, [l_lon, l_lat, r_lon, r_lat])),
+            "limit": 1000,
+        },
+        headers={"X-API-Key": OPENAQ_API_KEY},
+    ).json()["results"]
 
-    # print(f"sensors: {[sensors[_]['display_name'] for _ in sensors]}\n")
+    stations: dict[int, Station] = {}
+    for station in results:
+        sensors: dict[int, StationSensor] = {}
+        sensors_by_name: dict[str, SensorRef] = {}
+
+        for sensor in station["sensors"]:
+            param = sensor["parameter"]
+            sensors[sensor["id"]] = StationSensor(
+                id=sensor["id"],
+                display_name=param["displayName"],
+                units=param["units"],
+            )
+            sensors_by_name[param["displayName"]] = SensorRef(
+                id=sensor["id"],
+                units=param["units"],
+            )
+
+        stations[station["id"]] = Station(
+            name=station["name"],
+            owner=station["owner"]["name"],
+            bbox_bounds=station["bounds"],
+            sensors=sensors,
+            sensors_by_name=sensors_by_name,
+        )
+
+    return CityAQI(city_name=city_name, stations=stations)
 
 
-def get_latest_readings_from_station(station_id: str, limit: int = 100) -> dict: # sensor_id: readings
-    readings = requests.get(
+# API HELPERS
+
+
+def get_latest_readings_from_station(
+    city: CityAQI, station_id: int, limit: int = 100
+) -> dict[int, Reading]:
+    """Fetch the latest reading for every sensor at a station."""
+    results = requests.get(
         f"https://api.openaq.org/v3/locations/{station_id}/latest",
         params={"limit": limit},
         headers={"X-API-Key": OPENAQ_API_KEY},
     ).json()["results"]
 
-    _readings = {}
-    for reading in readings:
-        sensor_id = reading["sensorsId"]
-        _station_sensor = _aqi_stations[station_id]["sensors"][sensor_id]
+    readings: dict[int, Reading] = {}
+    for result in results:
+        sensor_id = result["sensorsId"]
+        sensor = city.stations[station_id].sensors[sensor_id]
+        readings[sensor_id] = Reading(
+            value=result["value"],
+            display_name=sensor.display_name,
+            units=sensor.units,
+            datetime=datetime.strptime(
+                result["datetime"]["utc"], r"%Y-%m-%dT%H:%M:%SZ"
+            ),
+        )
 
-        _readings[sensor_id] = {
-            "value": reading["value"],
-            "display_name": _station_sensor["display_name"],
-            "units": _station_sensor["units"],
-            "datetime": datetime.strptime(
-                reading["datetime"]["utc"], r"%Y-%m-%dT%H:%M:%SZ"
-            ),  # 2026-03-28T16:00:00Z
-        }
-
-    return _readings
+    return readings
 
 
-def get_hourly_readings_from_sensor(sensor_id: str, hours: int = 24, limit: int = 100) -> list: # list of readings
-    readings = requests.get(
+def get_hourly_readings_from_sensor(
+    sensor_id: int, hours: int = 24, limit: int = 100
+) -> list[Reading]:
+    """Fetch hourly readings for a specific sensor over the last N hours."""
+    results = requests.get(
         f"https://api.openaq.org/v3/sensors/{sensor_id}/hours",
         params={
             "limit": limit,
@@ -109,20 +163,18 @@ def get_hourly_readings_from_sensor(sensor_id: str, hours: int = 24, limit: int 
         headers={"X-API-Key": OPENAQ_API_KEY},
     ).json()["results"]
 
-    _readings = []
-    for reading in readings:
-        _readings.append(
-            {
-                "value": reading["value"],
-                "display_name": reading["parameter"]["name"],
-                "units": reading["parameter"]["units"],
-                "datetime": datetime.strptime(
-                    reading["period"]["datetimeTo"]["utc"], r"%Y-%m-%dT%H:%M:%SZ"
-                ),
-            }
+    return [
+        Reading(
+            value=result["value"],
+            display_name=result["parameter"]["name"],
+            units=result["parameter"]["units"],
+            datetime=datetime.strptime(
+                result["period"]["datetimeTo"]["utc"], r"%Y-%m-%dT%H:%M:%SZ"
+            ),
         )
-    
-    return _readings
+        for result in results
+    ]
+
 
 # so now we have access to all the stations for a given location, which we can query by their station id
 # and each station has a bunch of sensors, which we can query by their sensor id
@@ -132,18 +184,23 @@ def get_hourly_readings_from_sensor(sensor_id: str, hours: int = 24, limit: int 
 # 2. get an arbitrary range of hourly readings for any specific sensor [note that each sensor is unique, in which, it depends on the station]
 
 
-# for example, say we did all of this, and now on our homepage, we want to display a nice chart about the latest readings
-# (last 24h) of the CO ppb censor at patia, or say in this example, across Bhubaneswar
+# EXAMPLE USAGE
+# say we did all of this, and now on our homepage, we want to display a nice chart about the latest readings
+# (last 4h) of the CO ppb censor at patia, or say in this example, across Bhubaneswar
 
-for _station_id in _aqi_stations:
-    station_sensors_by_id = _aqi_stations[_station_id]['sensors']
-    station_sensors_by_name = _aqi_stations[_station_id]['sensors_by_name']
+if __name__ == "__main__":
+    city = fetch_city_aqi(CITY_OSMID)
 
-    print(f"\nFor station {_aqi_stations[_station_id]['name']}...")
-    print(f"Avaliable sensors are: {station_sensors_by_name.keys()}")
+    for station_id, station in city.stations.items():
+        print(f"\nFor station {station.name}...")
+        print(f"Available sensors: {list(station.sensors_by_name.keys())}")
 
-    target_sensor_id = station_sensors_by_name[input("Enter sensor of choice: ").strip()]['id']
-    print("Getting readings...")
-    for reading in get_hourly_readings_from_sensor(target_sensor_id):
-        print(reading['datetime'].isoformat(), reading['value'], reading['units'])
+        sensor_name = input("Enter sensor of choice: ").strip()
+        target_sensor_id = station.sensors_by_name[sensor_name].id
 
+        print("Getting readings...")
+        for reading in get_hourly_readings_from_sensor(target_sensor_id):
+            print(reading.datetime.isoformat(), reading.value, reading.units)
+
+    
+    
