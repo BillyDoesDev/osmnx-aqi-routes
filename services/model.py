@@ -252,70 +252,70 @@ def predict_pm25(station_id: int, recent_readings: list[dict]) -> float:
     return float(model.predict(X)[0])
 
 
-# multi step inference
-def predict_pm25_sequence(
-    station_id: int,
-    recent_readings: list[dict],
-    n_steps: int = 10,
-) -> list[dict]:
-    """
-    Autoregressively predict PM2.5 for the next n_steps x 15 minutes.
+# # multi step inference
+# def predict_pm25_sequence(
+#     station_id: int,
+#     recent_readings: list[dict],
+#     n_steps: int = 10,
+# ) -> list[dict]:
+#     """
+#     Autoregressively predict PM2.5 for the next n_steps x 15 minutes.
 
-    Returns a list of dicts, each with:
-        - 'step':     step index (1 = +15 min, 2 = +30 min, ...)
-        - 'minutes':  minutes from now
-        - 'pm25':     predicted PM2.5 (µg/m³)
-        - 'datetime': predicted UTC datetime
+#     Returns a list of dicts, each with:
+#         - 'step':     step index (1 = +15 min, 2 = +30 min, ...)
+#         - 'minutes':  minutes from now
+#         - 'pm25':     predicted PM2.5 (µg/m³)
+#         - 'datetime': predicted UTC datetime
 
-    How it works:
-        The model was trained to predict HORIZON steps ahead (30 min).
-        For multi-step forecasting we use an autoregressive strategy:
-        each prediction is fed back as a new "reading" so the next
-        prediction can use it as a lag feature. Uncertainty compounds
-        with each step — communicate this honestly in your presentation.
-    """
-    if len(recent_readings) < N_LAGS:
-        raise ValueError(
-            f"Need at least {N_LAGS} readings, got {len(recent_readings)}."
-        )
+#     How it works:
+#         The model was trained to predict HORIZON steps ahead (30 min).
+#         For multi-step forecasting we use an autoregressive strategy:
+#         each prediction is fed back as a new "reading" so the next
+#         prediction can use it as a lag feature. Uncertainty compounds
+#         with each step.
+#     """
+#     if len(recent_readings) < N_LAGS:
+#         raise ValueError(
+#             f"Need at least {N_LAGS} readings, got {len(recent_readings)}."
+#         )
 
-    model, feature_cols, label_encoder, _ = load_model()
+#     model, feature_cols, label_encoder, _ = load_model()
 
-    # Start with a rolling window of the most recent N_LAGS readings
-    window = list(recent_readings[-N_LAGS:])
-    rows = _prepare_rows(window)
-    # print(rows)
-    last_dt = rows["datetime"].iloc[-1]
+#     # Start with a rolling window of the most recent N_LAGS readings
+#     window = list(recent_readings[-N_LAGS:])
+#     rows = _prepare_rows(window)
+#     # print(rows)
+#     last_dt = rows["datetime"].iloc[-1]
 
-    results = []
-    for step in range(1, n_steps + 1):
-        X = _build_feature_row(rows, station_id, label_encoder, feature_cols)
-        # print(X)
-        predicted = float(model.predict(X)[0])
-        next_dt = last_dt + pd.Timedelta(minutes=15 * step)
+#     results = []
+#     for step in range(1, n_steps + 1):
+#         X = _build_feature_row(rows, station_id, label_encoder, feature_cols)
+#         # print(X)
+#         predicted = float(model.predict(X)[0])
+#         next_dt = last_dt + pd.Timedelta(minutes=15 * step)
 
-        results.append(
-            {
-                "step": step,
-                "minutes": 15 * step,
-                "pm25": round(predicted, 2),
-                "datetime": next_dt.isoformat(),
-            }
-        )
+#         results.append(
+#             {
+#                 "step": step,
+#                 "minutes": 15 * step,
+#                 "pm25": round(predicted, 2),
+#                 "datetime": next_dt.isoformat(),
+#             }
+#         )
 
-        # Feed prediction back into the window as a synthetic reading,
-        # preserving the most recent meteorological context
-        latest = window[-1].copy()
-        latest["datetime"] = next_dt.isoformat()
-        latest["pm25"] = predicted
-        # pm10 roughly tracks pm25 — use last known ratio to approximate
-        if window[-1].get("pm10") and window[-1].get("pm25"):
-            ratio = window[-1]["pm10"] / max(window[-1]["pm25"], 1)
-            latest["pm10"] = predicted * ratio
-        window.append(latest)
-        rows = _prepare_rows(window[-N_LAGS:])
+#         # Feed prediction back into the window as a synthetic reading,
+#         # preserving the most recent meteorological context
+#         latest = window[-1].copy()
+#         latest["datetime"] = next_dt.isoformat()
+#         latest["pm25"] = predicted
+#         # pm10 roughly tracks pm25 -- use last known ratio to approximate
+#         if window[-1].get("pm10") and window[-1].get("pm25"):
+#             ratio = window[-1]["pm10"] / max(window[-1]["pm25"], 1)
+#             latest["pm10"] = predicted * ratio
+#         window.append(latest)
+#         rows = _prepare_rows(window[-N_LAGS:])
 
-    return results
+#     return results
 
 
 # spatial inference
