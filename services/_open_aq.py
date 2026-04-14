@@ -1,19 +1,21 @@
 # OpenAQ docs at: https://api.openaq.org/docs
 
 from datetime import datetime, timedelta
-import subprocess
+from typing import List, Tuple
 
 import osmnx as ox
 import requests
 from dotenv import load_dotenv
 from pydantic import BaseModel
 import os
+from graph_service import CITY_OSMID
+from collections import defaultdict
+from model import N_LAGS
 
 
 load_dotenv()
 
 OPENAQ_API_KEY = os.getenv("OPENAQ_API_KEY")
-CITY_OSMID = "R10108023"
 
 
 class SensorRef(BaseModel):
@@ -51,6 +53,7 @@ class Reading(BaseModel):
     display_name: str
     units: str
     datetime: datetime
+    datetime_as_str: str
 
 
 # get our target city of choice, Bhubaneswar in our case
@@ -156,9 +159,8 @@ def get_hourly_readings_from_sensor(
         params={
             "limit": limit,
             "datetime_from": (datetime.now() - timedelta(hours=hours))
-            .date()
             .isoformat(),
-            "datetime_to": datetime.now().date().isoformat(),
+            "datetime_to": datetime.now().isoformat(),
         },
         headers={"X-API-Key": OPENAQ_API_KEY},
     ).json()["results"]
@@ -171,6 +173,7 @@ def get_hourly_readings_from_sensor(
             datetime=datetime.strptime(
                 result["period"]["datetimeTo"]["utc"], r"%Y-%m-%dT%H:%M:%SZ"
             ),
+            datetime_as_str=result["period"]["datetimeTo"]["utc"],
         )
         for result in results
     ]
@@ -182,6 +185,37 @@ def get_hourly_readings_from_sensor(
 # and now, after defining the above methods, we can either:
 # 1. get the latest redings for all sensors in any station
 # 2. get an arbitrary range of hourly readings for any specific sensor [note that each sensor is unique, in which, it depends on the station]
+
+
+def get_recent_station_readings(city:CityAQI, N_LAGS:int=N_LAGS) -> List[Tuple[int, List[dict]]]:
+    # maps to FEATURES, as trained in the model
+    _keys = [('PM10', 'pm10'), ('PM2.5', 'pm25'), ('RH', 'relativehumidity'), ('Temperature (C)', 'temperature'), ('Wind direction', 'wind_direction'), ('Wind speed', 'wind_speed')]
+    recent_station_readings = []
+
+    for station_id, station in city.stations.items():
+        _num_readings = 0
+        _sensor_readings = defaultdict(list)
+
+        for _k, needed_sensor in _keys:
+            needed_sensor_id = station.sensors_by_name[_k].id
+            n_lags_readings = get_hourly_readings_from_sensor(sensor_id=needed_sensor_id, hours=N_LAGS*2)
+            _num_readings = len(n_lags_readings)
+            
+            for reading in n_lags_readings:
+                _sensor_readings[needed_sensor].append((reading.datetime_as_str, reading.value))
+        
+        recent_readings = []
+        for i in range(_num_readings):
+            recent_reading = {}
+            for _, key in _keys:
+                # print(key, _sensor_readings[key][i])
+                recent_reading[key] = _sensor_readings[key][i][1]
+            recent_reading["datetime"] = _sensor_readings[key][i][0]
+            recent_readings.append(recent_reading)
+        
+        recent_station_readings.append( (station_id, recent_readings) )
+
+    return recent_station_readings
 
 
 # EXAMPLE USAGE
@@ -201,6 +235,4 @@ if __name__ == "__main__":
         print("Getting readings...")
         for reading in get_hourly_readings_from_sensor(target_sensor_id):
             print(reading.datetime.isoformat(), reading.value, reading.units)
-
-    
     
