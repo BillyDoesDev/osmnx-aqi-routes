@@ -12,6 +12,8 @@ import osmnx as ox
 import numpy as np
 from dataclasses import dataclass
 
+import requests
+
 from model import interpolate_pm25_for_nodes, predict_pm25
 from graph_service import CITY_OSMID
 from _open_aq import get_recent_station_readings, fetch_city_aqi
@@ -49,7 +51,9 @@ def get_travel_time_weight(G: nx.MultiDiGraph, u: int, v: int, data: dict) -> fl
     TODO: replace with live traffic speed when available -- this is the only
           function you need to change when adding a traffic data source.
     """
-    return data.get("travel_time", data.get("length", 1) / 8.33)  # fallback: 30 km/h
+    # _ = data.get("travel_time", data.get("length", 1) / 6.944)  # fallback: 25 km/h
+    # print(f"{data.get("length", 1) / 6.944, data.get("travel_time", None), _ = }")
+    return data.get("length", 1) / 6.944 # fallback: 25 km/h
 
 
 # update as you get better data sources
@@ -245,6 +249,106 @@ def compute_routes(
 #     return timeline
 
 
+def get_decision_nodes(G: nx.MultiDiGraph, node_sequence: list[int]) -> list[tuple[float, float]]:
+    """Extract only nodes where the road changes direction or name."""
+    if len(node_sequence) < 2:
+        return [(G.nodes[n]["y"], G.nodes[n]["x"]) for n in node_sequence]
+
+    waypoints = [node_sequence[0]]  # always include start
+
+    for i in range(1, len(node_sequence) - 1):
+        prev, curr, next_ = node_sequence[i-1], node_sequence[i], node_sequence[i+1]
+        
+        # Check if road name changes at this node
+        edge_in  = G.get_edge_data(prev, curr,  0) or {}
+        edge_out = G.get_edge_data(curr, next_, 0) or {}
+        name_in  = edge_in.get("name",  "")
+        name_out = edge_out.get("name", "")
+        
+        # Check if road type changes (e.g. primary -> residential)
+        hw_in  = edge_in.get("highway",  "")
+        hw_out = edge_out.get("highway", "")
+
+        if name_in != name_out or hw_in != hw_out:
+            waypoints.append(curr)
+
+    waypoints.append(node_sequence[-1])  # always include end
+    return [(G.nodes[n]["y"], G.nodes[n]["x"]) for n in waypoints]
+
+
+def get_directions_for_route(G: nx.MultiDiGraph, node_sequence: list[int]) -> list[dict]:
+    """
+    Given a sequence of (lat, lon) coords from OSMnx routing,
+    snap to OSRM via /match and get back turn-by-turn directions.
+    """
+    waypoints = get_decision_nodes(G, node_sequence)
+    # print(len(waypoints))
+
+    # Safety cap — shouldn't hit this often now
+    MAX_WAYPOINTS = 10
+    if len(waypoints) > MAX_WAYPOINTS:
+        indices   = np.linspace(0, len(waypoints) - 1, MAX_WAYPOINTS, dtype=int)
+        waypoints = [waypoints[i] for i in indices]
+
+    coords_str = ";".join(f"{lon},{lat}" for lat, lon in waypoints)
+
+
+    resp = requests.get(
+        f"http://router.project-osrm.org/match/v1/car/{coords_str}",
+        params={
+            "steps":     "true",
+            "geometries": "polyline",
+            "overview":  "false",
+            # "ttype":     "duration",  # match by duration, not distance
+        },
+        timeout=15,
+    )
+    data = resp.json()
+
+    if data.get("code") != "Ok" or not data.get("matchings"):
+        return []
+
+    steps = []
+    for matching in data["matchings"]:
+        for leg in matching["legs"]:
+            for step in leg["steps"]:
+                maneuver = step.get("maneuver", {})
+                mtype    = maneuver.get("type", "")
+                modifier = maneuver.get("modifier", "")
+                name     = step.get("name", "").strip() or "unnamed road"
+                distance = step.get("distance", 0)
+
+                if mtype == "depart":
+                    instruction = f"Head {modifier} on {name}" if modifier else f"Start on {name}"
+                elif mtype == "arrive":
+                    instruction = "Arrive at destination"
+                elif mtype == "turn":
+                    instruction = f"Turn {modifier} onto {name}"
+                elif mtype == "new name":
+                    instruction = f"Continue onto {name}"
+                elif mtype == "merge":
+                    instruction = f"Merge onto {name}"
+                elif mtype in ("on ramp", "off ramp"):
+                    instruction = f"Take the {'ramp' if 'on' in mtype else 'exit'} onto {name}"
+                elif mtype == "fork":
+                    instruction = f"Keep {modifier} at the fork onto {name}"
+                elif mtype in ("roundabout", "rotary"):
+                    exit_num = maneuver.get("exit", "")
+                    instruction = f"At the roundabout, take exit {exit_num} onto {name}"
+                elif mtype == "end of road":
+                    instruction = f"At the end of the road, turn {modifier} onto {name}"
+                else:
+                    instruction = f"Continue on {name}"
+
+                steps.append({
+                    "instruction": instruction,
+                    "distance":    round(distance),
+                    "type":        mtype,
+                })
+
+    return steps
+
+
 if __name__ == "__main__":
     city = fetch_city_aqi(CITY_OSMID)
     station_preds = {
@@ -260,3 +364,11 @@ if __name__ == "__main__":
 
     fastest, optimal = compute_routes(start_coords, end_coords, station_preds, alpha=0)
     print(f"{fastest.mean_pm25, optimal.mean_pm25 = }")
+    print(f"{fastest.total_distance/1e3, fastest.total_time/(60) = }")
+    print(f"{optimal.total_distance/1e3, optimal.total_time/(60) = }")
+
+    print("getting directions for optimal route now...")
+    optimal_steps = get_directions_for_route(_graph, optimal.node_sequence)
+    for step in optimal_steps:
+        print(step)
+
