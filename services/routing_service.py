@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from model import interpolate_pm25_for_nodes, predict_pm25
 from graph_service import CITY_OSMID
+from _open_aq import get_recent_station_readings, fetch_city_aqi
 
 
 DEFAULT_ALPHA = 0.5
@@ -26,7 +27,6 @@ G = ox.add_edge_speeds(G)
 G = ox.add_edge_travel_times(G)
 _graph = G
 print(f"Graph loaded: {len(G.nodes):,} nodes, {len(G.edges):,} edges.")
-    
 
 
 def get_graph() -> nx.MultiDiGraph:
@@ -52,9 +52,22 @@ def get_travel_time_weight(G: nx.MultiDiGraph, u: int, v: int, data: dict) -> fl
     return data.get("travel_time", data.get("length", 1) / 8.33)  # fallback: 30 km/h
 
 
+# update as you get better data sources
+ROAD_POLLUTION_MULTIPLIER = {
+    "motorway": 2.0,
+    "trunk": 1.8,
+    "primary": 1.5,
+    "secondary": 1.2,
+    "tertiary": 1.0,
+    "residential": 0.7,
+    "unclassified": 0.9,
+}
+
+
 def get_pollution_weight(
     u: int,
     v: int,
+    data,
     node_pm25: dict[int, float],
 ) -> float:
     """
@@ -63,7 +76,12 @@ def get_pollution_weight(
     """
     pm_u = node_pm25.get(u, 0.0)
     pm_v = node_pm25.get(v, 0.0)
-    return (pm_u + pm_v) / 2.0
+    base = (pm_u + pm_v) / 2.0
+    highway = data.get("highway", "unclassified")
+    if isinstance(highway, list):
+        highway = highway[0]
+    multiplier = ROAD_POLLUTION_MULTIPLIER.get(highway, 1.0)
+    return base * multiplier
 
 
 # composite weight
@@ -86,7 +104,7 @@ def build_composite_graph(
 
     for u, v, data in G.edges(data=True):
         travel_times.append(get_travel_time_weight(G, u, v, data))
-        pollution_vals.append(get_pollution_weight(u, v, node_pm25))
+        pollution_vals.append(get_pollution_weight(u, v, data, node_pm25))
 
     tt_arr = np.array(travel_times, dtype=float)
     pol_arr = np.array(pollution_vals, dtype=float)
@@ -131,7 +149,7 @@ def _extract_route(
             data = G.get_edge_data(u, v, 0) or {}
             distances.append(data.get("length", 0))
             times.append(get_travel_time_weight(G, u, v, data))
-            pm25_vals.append(get_pollution_weight(u, v, node_pm25))
+            pm25_vals.append(get_pollution_weight(u, v, data, node_pm25))
 
     return RouteResult(
         node_sequence=route,
@@ -172,6 +190,9 @@ def compute_routes(
     node_coords = [(n, G.nodes[n]["y"], G.nodes[n]["x"]) for n in G.nodes]
     node_pm25 = interpolate_pm25_for_nodes(node_coords, station_predictions)
 
+    # pm25_values = list(node_pm25.values())
+    # print(np.min(pm25_values), np.max(pm25_values), np.std(pm25_values))
+
     # ── Fastest route (travel time only) ──
     fastest_nodes = nx.shortest_path(G, orig, dest, weight="travel_time")
     fastest = _extract_route(G, fastest_nodes, node_pm25)
@@ -184,79 +205,52 @@ def compute_routes(
     return fastest, optimal
 
 
-def build_pollution_timeline(
-    route: RouteResult,
-    pm25_sequence: list[dict],  # output of predict_pm25_sequence()
-    interval_minutes: int = 15,
-) -> list[dict]:
-    """
-    Map a station's PM2.5 forecast sequence onto 15-minute waypoints
-    along the route for display as a timeline chart.
+# def build_pollution_timeline(
+#     route: RouteResult,
+#     pm25_sequence: list[dict],  # output of predict_pm25_sequence()
+#     interval_minutes: int = 15,
+# ) -> list[dict]:
+#     """
+#     Map a station's PM2.5 forecast sequence onto 15-minute waypoints
+#     along the route for display as a timeline chart.
 
-    pm25_sequence: output of predict_pm25_sequence(n_steps=10) --
-        [{"step": 1, "minutes": 15, "pm25": ..., "datetime": ...}, ...]
+#     pm25_sequence: output of predict_pm25_sequence(n_steps=10) --
+#         [{"step": 1, "minutes": 15, "pm25": ..., "datetime": ...}, ...]
 
-    Returns a list of dicts suitable for charting:
-        [{"minutes": 0,  "pm25": 120.5, "datetime": "...", "label": "Now"},
-         {"minutes": 15, "pm25": 118.2, "datetime": "...", "label": "+15 min"},
-         ...]
-    """
-    # Current conditions (step 0) -- use route mean as the "now" baseline
-    timeline = [
-        {
-            "minutes": 0,
-            "pm25": round(route.mean_pm25, 2),
-            "datetime": None,
-            "label": "Now",
-        }
-    ]
+#     Returns a list of dicts suitable for charting:
+#         [{"minutes": 0,  "pm25": 120.5, "datetime": "...", "label": "Now"},
+#          {"minutes": 15, "pm25": 118.2, "datetime": "...", "label": "+15 min"},
+#          ...]
+#     """
+#     # Current conditions (step 0) -- use route mean as the "now" baseline
+#     timeline = [
+#         {
+#             "minutes": 0,
+#             "pm25": round(route.mean_pm25, 2),
+#             "datetime": None,
+#             "label": "Now",
+#         }
+#     ]
 
-    for entry in pm25_sequence:
-        timeline.append(
-            {
-                "minutes": entry["minutes"],
-                "pm25": entry["pm25"],
-                "datetime": entry["datetime"],
-                "label": f"+{entry['minutes']} min",
-            }
-        )
+#     for entry in pm25_sequence:
+#         timeline.append(
+#             {
+#                 "minutes": entry["minutes"],
+#                 "pm25": entry["pm25"],
+#                 "datetime": entry["datetime"],
+#                 "label": f"+{entry['minutes']} min",
+#             }
+#         )
 
-    return timeline
+#     return timeline
 
 
 if __name__ == "__main__":
+    city = fetch_city_aqi(CITY_OSMID)
     station_preds = {
-        3409505: predict_pm25(3409505, [
-                {"datetime": "2026-01-01T10:00:00+05:30", "pm25": 120, "pm10": 200,
-                "wind_speed": 0.3, "wind_direction": 135,
-                "temperature": 22, "relativehumidity": 80},
-                {"datetime": "2026-01-01T10:00:00+05:30", "pm25": 120, "pm10": 200,
-                "wind_speed": 0.3, "wind_direction": 135,
-                "temperature": 22, "relativehumidity": 80},
-                {"datetime": "2026-01-01T10:00:00+05:30", "pm25": 120, "pm10": 200,
-                "wind_speed": 0.3, "wind_direction": 135,
-                "temperature": 22, "relativehumidity": 80},
-                {"datetime": "2026-01-01T10:00:00+05:30", "pm2": 120, "pm10": 200,
-                "wind_": 0.3, "wind_direction": 135,
-                "temperature": 22, "relativehumidity": 80},
-            ]),
-
-        3409508: predict_pm25(3409508, [
-                {"datetime": "2026-01-01T10:00:00+05:30", "pm25": 120, "pm10": 200,
-                "wind_speed": 0.3, "wind_direction": 135,
-                "temperature": 22, "relativehumidity": 80},
-                {"datetime": "2026-01-01T10:00:00+05:30", "pm25": 120, "pm10": 200,
-                "wind_speed": 0.3, "wind_direction": 135,
-                "temperature": 22, "relativehumidity": 80},
-                {"datetime": "2026-01-01T10:00:00+05:30", "pm25": 120, "pm10": 200,
-                "wind_speed": 0.3, "wind_direction": 135,
-                "temperature": 22, "relativehumidity": 80},
-                {"datetime": "2026-01-01T10:00:00+05:30", "pm2": 120, "pm10": 200,
-                "wind_": 0.3, "wind_direction": 135,
-                "temperature": 22, "relativehumidity": 80},
-            ])
+        station_id: predict_pm25(station_id, station_readings)
+        for station_id, station_readings in get_recent_station_readings(city)
     }
-    
 
     _orig = ox.geocoder.geocode_to_gdf("kiit campus 6")
     start_coords = _orig["lat"].iloc[0], _orig["lon"].iloc[0]
@@ -264,5 +258,5 @@ if __name__ == "__main__":
     _dest = ox.geocoder.geocode_to_gdf("Master Canteen")
     end_coords = _dest["lat"].iloc[0], _dest["lon"].iloc[0]
 
-    fastest, optimal = compute_routes(start_coords, end_coords, station_preds, alpha=0.5)
+    fastest, optimal = compute_routes(start_coords, end_coords, station_preds, alpha=0)
     print(f"{fastest.mean_pm25, optimal.mean_pm25 = }")
