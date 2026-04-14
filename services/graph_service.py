@@ -13,13 +13,14 @@ _boundary_geojson = None  # raw GeoJSON geometry dict
 _boundary_shape = None  # shapely shape for point-in-polygon
 OSRM_BASE = "http://router.project-osrm.org/route/v1/driving"
 
+CITY_OSMID = "R10108023"
 
 def get_boundary() -> Tuple[GeoDataFrame, str, polygon.Polygon]:
     """Fetch Bhubaneswar's actual political boundary polygon."""
     global city, _boundary_geojson, _boundary_shape
 
     # https://nominatim.openstreetmap.org/ui/search.html?q=R10108023
-    city = ox.geocoder.geocode_to_gdf("R10108023", by_osmid=True)
+    city = ox.geocoder.geocode_to_gdf(CITY_OSMID, by_osmid=True)
 
     _boundary_geojson = city.to_json()
     _boundary_shape = shape(json.loads(_boundary_geojson)["features"][0]["geometry"])
@@ -36,6 +37,17 @@ def generate_base_map() -> folium.Map:
         tiles="OpenStreetMap",
     )
     Fullscreen().add_to(m)
+
+    # get bounding rectangle
+    # lat, lon = city.lat.iloc[0], city.lon.iloc[0]
+    # l_lat, l_lon = city.bbox_south.iloc[0], city.bbox_west.iloc[0]
+    # r_lat, r_lon = city.bbox_north.iloc[0], city.bbox_east.iloc[0]
+
+    # m = folium.Map(location=[lat, lon], zoom_start=13)
+    # folium.Marker(location=[lat, lon]).add_to(m)
+    # folium.Rectangle(
+    #     bounds=[[l_lat, l_lon], [r_lat, r_lon]],
+    # ).add_to(m)
 
     folium.GeoJson(
         geojson,

@@ -11,4 +11,12 @@ dependencies = [
     "ipykernel>=7.2.0",
     "mapclassify>=2.10.0",
     "osmnx[all]>=2.1.0",
+    "python-dotenv>=1.2.2",
+    "joblib>=1.5.3",
+]
+
+[dependency-groups]
+dev = [
+    "awscli>=1.44.64",
+    "xgboost>=3.2.0",
 ]

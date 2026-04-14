@@ -17,3 +17,7 @@ cache/
 spam*
 rough*
 notebooks
+
+# Misc
+data*
+.env
