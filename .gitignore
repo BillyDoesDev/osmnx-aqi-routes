@@ -27,3 +27,4 @@ docs/*
 !docs/*.tex
 !docs/*.pdf
 !docs/assets/
+kiit*
