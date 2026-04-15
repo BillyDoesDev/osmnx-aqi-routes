@@ -5,16 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Foliage.{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css" />
-    <script defer src="/static/js/index.js"></script>
+    {% block styles %}
+        <link rel="stylesheet" href="/static/css/style.css" />
+    {% endblock %}
+
+    {% block scripts %}
+        <script defer src="/static/js/index.js"></script>
+    {% endblock %}
 </head>
 
 <body>
 
     <div class="navbar">
         <ul>
-            <li><a href="#">Home</a></li>
-            <li><a href="#">Station Stats</a></li>
+            <li><a href="/">Home</a></li>
+            <li><a href="/analytics">Analytics</a></li>
             <li><a href="#">Credits</a></li>
         </ul>
     </div>

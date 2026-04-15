@@ -10,6 +10,7 @@ import logging
 from services.model import predict_pm25
 from services.routing_service import get_graph
 
+from routes.analytics_routes import router as analytics_router
 
 logging.basicConfig(
     format="[{levelname}] {asctime}: {message}", style="{", level=logging.DEBUG
@@ -44,6 +45,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.include_router(analytics_router)
+
 templates = Jinja2Templates(directory="templates")
 
 
@@ -55,6 +58,15 @@ async def index(request: Request):
         {
             "request": request,
             "map_html": m._repr_html_(),
+        },
+    )
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse(
+        "analytics.html",
+        {
+            "request": request,
         },
     )
 

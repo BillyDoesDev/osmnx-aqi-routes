@@ -10,7 +10,12 @@ from pydantic import BaseModel
 import os
 # from graph_service import CITY_OSMID
 from collections import defaultdict
-from services.model import N_LAGS
+
+try:
+    from services.model import N_LAGS
+except ImportError:
+    from model import N_LAGS
+
 
 
 load_dotenv()

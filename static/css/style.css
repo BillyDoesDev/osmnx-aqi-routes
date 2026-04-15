@@ -89,7 +89,7 @@ li:hover {
 
 .spacer {
     width: 2rem;
-    height: 3rem;
+    height: 5rem;
 }
 
 a {
@@ -224,4 +224,33 @@ a {
 }
 [type=range]::-ms-tooltip {
   display: none;
+}
+
+.route-tab-header {
+    text-transform: uppercase;
+    color: #00aaff;
+    font-weight: 800;
+    padding-bottom: 1rem;
+}
+
+.summary-label {
+    text-transform: capitalize;
+}
+
+.summary {
+    display: grid;
+    grid-template-columns: 1fr;
+}
+
+.summary-item {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+.summary-value {
+    opacity: 80%;
+}
+
+.dir-header {
+    padding-top: 1rem;
 }

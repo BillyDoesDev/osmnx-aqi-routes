@@ -21,3 +21,8 @@ notebooks
 # Misc
 data*
 .env
+
+# LaTeX stuff
+docs/*
+!docs/*.tex
+!docs/*.pdf

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Foliage: Analytics
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script defer src="/static/js/chart_handler.js"></script>
+{% endblock %}
+
+{% block styles %}
+    <link rel="stylesheet" href="/static/css/analytics.css" />
+{% endblock %}
+
+
+{% block content %}
+
+<main>
+
+  <!-- ── Section 1: Model Performance ── -->
+  <section id="model-section">
+    <div class="section-header">
+      <span class="section-title">Model Performance</span>
+      <span class="section-tag">PM2.5 · XGBoost · 30-min horizon</span>
+    </div>
+
+    <div class="metrics-row" id="metrics-row">
+      <div class="metric-pill skeleton" style="height:72px"></div>
+      <div class="metric-pill skeleton" style="height:72px"></div>
+      <div class="metric-pill skeleton" style="height:72px"></div>
+      <div class="metric-pill skeleton" style="height:72px"></div>
+    </div>
+
+    <div class="chart-grid-2" style="margin-bottom:20px">
+      <div class="chart-card">
+        <div class="chart-title">TRAINING vs VALIDATION RMSE</div>
+        <div class="chart-wrap" style="height:240px">
+          <canvas id="curveChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">PREDICTED vs ACTUAL PM2.5</div>
+        <div class="chart-wrap" style="height:240px">
+          <canvas id="scatterChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">FEATURE IMPORTANCE (TOP 20 · GAIN)</div>
+      <div id="fi-list" class="fi-list" style="margin-top:8px">
+        <div class="skeleton" style="height:200px;border-radius:6px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 2: AQI Station Data ── -->
+  <section id="aqi-section">
+    <div class="section-header">
+      <span class="section-title">Live AQI: Station Readings</span>
+      <span class="section-tag">OpenAQ · Bhubaneswar</span>
+    </div>
+    <div class="station-grid" id="station-grid">
+      <div class="skeleton" style="height:280px;border-radius:10px"></div>
+      <div class="skeleton" style="height:280px;border-radius:10px"></div>
+    </div>
+  </section>
+
+</main>
+
+{% endblock %}
