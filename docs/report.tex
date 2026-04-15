@@ -13,12 +13,14 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{float}
 
 \hypersetup{
   colorlinks=true,
-  linkcolor=blue!60!black,
-  urlcolor=blue!60!black,
-  citecolor=blue!60!black,
+  linkcolor=black,
+  urlcolor=black,
+  citecolor=black,
 }
 
 \titleformat{\section}{\large\bfseries}{{\thesection.}}{0.6em}{}
@@ -26,15 +28,30 @@
 \titleformat{\subsubsection}{\normalsize\itshape}{{\thesubsubsection.}}{0.5em}{}
 
 \title{
-  \textbf{A Pollution-Aware Urban Routing System} \\[0.4em]
-  \large Technical Design and Methodology
+  \textbf{A Pollution-Aware Urban Routing System} \\[-0em]
+  \large 8th Semester Final Project \\[-0.7em]
 }
-\author{Final Year Project --- Technical Report}
-\date{\today}
 
+\author{
+  \begin{tabular}{c}
+    \textbf{Dhrubajyoti Mandal} \\
+    Computer Science and Engineering \\
+    KIIT University \\
+    \texttt{22053859@kiit.ac.in}
+  \end{tabular}
+  \begin{tabular}{c}
+    \textbf{Prof. Sujoy Dutta} \\
+    Computer Science and Engineering \\
+    KIIT University \\
+    \texttt{sdattafcs@kiit.ac.in}
+  \end{tabular}
+}
+\date{}
 \begin{document}
 
+\vspace{-5em}
 \maketitle
+\vspace{-3em}
 \tableofcontents
 \newpage
 
@@ -181,17 +198,17 @@ The dataset is split chronologically (80\% train, 20\% test) without shuffling, 
 Hyperparameters used:
 
 \begin{center}
-\begin{tabular}{ll}
-  \toprule
-  Parameter & Value \\
-  \midrule
-  \texttt{n\_estimators} & 300 \\
-  \texttt{learning\_rate} & 0.05 \\
-  \texttt{max\_depth} & 6 \\
-  \texttt{subsample} & 0.8 \\
-  \texttt{colsample\_bytree} & 0.8 \\
-  \bottomrule
-\end{tabular}
+  \begin{tabular}{ll}
+    \toprule
+    Parameter & Value \\
+    \midrule
+    \texttt{n\_estimators} & 200 \\
+    \texttt{learning\_rate} & 0.05 \\
+    \texttt{max\_depth} & 2 \\
+    \texttt{subsample} & 0.8 \\
+    \texttt{colsample\_bytree} & 0.8 \\
+    \bottomrule
+  \end{tabular}
 \end{center}
 
 \subsection{Evaluation}
@@ -203,7 +220,36 @@ Performance is evaluated on the held-out test set using Mean Absolute Error (MAE
   \text{RMSE} = \sqrt{\frac{1}{N}\sum_{i=1}^{N}(y_i - \hat{y}_i)^2}
 \]
 
-The trained model achieved $\text{MAE} = 10.25\;\mu\text{g/m}^3$ and $\text{RMSE} = 16.29\;\mu\text{g/m}^3$ on the test set. Given that observed PM$_{2.5}$ values in Bhubaneswar regularly exceed $200\;\mu\text{g/m}^3$, the relative MAE is approximately 5\%, which is sufficient for meaningful route differentiation.
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/training-vs-validation.png}
+    \caption{Training vs Validation Error}
+    \label{fig:img1}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{assets/predicted-vs-actual.png}
+    \caption{Prediceted vs Actual PM2.5 Values}
+    \label{fig:img2}
+  \end{subfigure}
+
+  \caption{Model Evaluation Metrics}
+  \label{fig:model-evaluation}
+\end{figure}
+
+The trained model achieved $\text{MAE} = 8.55\;\mu\text{g/m}^3$ and $\text{RMSE} = 14.43\;\mu\text{g/m}^3$ on the test set. Given that observed PM$_{2.5}$ values in Bhubaneswar regularly hit around $800\;\mu\text{g/m}^3$, the relative MAE is approximately 1.027\%, which is sufficient for meaningful route differentiation.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{assets/feature-importance.png}
+  \caption{Feature Importance}
+  \label{fig:feature-importance}
+\end{figure}
+
+Further, as seen in figure \ref{fig:feature-importance}, the model relies heavily on \texttt{pm25\_lag1} and the hour of day, as given by \texttt{hour\_cos}.
 
 % ────────────────────────────────────────────────────────────
 \section{Spatial Interpolation of PM\texorpdfstring{$_{2.5}$}{2.5} to Road Graph Nodes}
@@ -242,19 +288,19 @@ IDW alone produces a smooth, nearly flat pollution surface when only two monitor
 where $\bar{v}_{(u,v)} = \tfrac{1}{2}(\hat{v}_u + \hat{v}_v)$ is the mean IDW estimate at the two endpoints of edge $(u, v)$, and $\mu_r$ is drawn from the following table:
 
 \begin{center}
-\begin{tabular}{lc}
-  \toprule
-  Road Type (\texttt{highway} tag) & Multiplier $\mu_r$ \\
-  \midrule
-  \texttt{motorway}      & 2.0 \\
-  \texttt{trunk}         & 1.8 \\
-  \texttt{primary}       & 1.5 \\
-  \texttt{secondary}     & 1.2 \\
-  \texttt{tertiary}      & 1.0 \\
-  \texttt{unclassified}  & 0.9 \\
-  \texttt{residential}   & 0.7 \\
-  \bottomrule
-\end{tabular}
+  \begin{tabular}{lc}
+    \toprule
+    Road Type (\texttt{highway} tag) & Multiplier $\mu_r$ \\
+    \midrule
+    \texttt{motorway}      & 2.0 \\
+    \texttt{trunk}         & 1.8 \\
+    \texttt{primary}       & 1.5 \\
+    \texttt{secondary}     & 1.2 \\
+    \texttt{tertiary}      & 1.0 \\
+    \texttt{unclassified}  & 0.9 \\
+    \texttt{residential}   & 0.7 \\
+    \bottomrule
+  \end{tabular}
 \end{center}
 
 This multiplier is grounded in the well-established positive correlation between traffic volume and roadside PM$_{2.5}$ concentrations. Higher-order roads carry more vehicles and therefore generate proportionally greater pollution exposure. When live traffic data becomes available, $\mu_r$ can be replaced by a dynamic speed-based factor, leaving the rest of the pipeline unchanged.
@@ -338,22 +384,47 @@ The system can be summarised as a pipeline with the following stages:
   \item Return both routes, their mean PM$_{2.5}$ exposure, and directions for rendering.
 \end{enumerate}
 
+\section{Demonstration}
+
+All the code can be found at: \url{https://github.com/BillyDoesDev/osmnx-aqi-routes}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{assets/homepage.png}
+  \caption{Project Homepage}
+  \label{fig:homepage}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{assets/step-by-step-directions.png}
+  \caption{Project Step By Step Directions}
+  \label{fig:step-by-step-directions}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\linewidth]{assets/analytics.png}
+  \caption{Analytics}
+  \label{fig:analytics}
+\end{figure}
+
 \begin{thebibliography}{9}
   \bibitem{dijkstra1959}
-    E.W. Dijkstra, ``A note on two problems in connexion with graphs,''
-    \textit{Numerische Mathematik}, vol. 1, pp. 269--271, 1959.
+  E.W. Dijkstra, ``A note on two problems in connexion with graphs,''
+  \textit{Numerische Mathematik}, vol. 1, pp. 269--271, 1959.
 
   \bibitem{chen2016xgboost}
-    T. Chen and C. Guestrin, ``XGBoost: A scalable tree boosting system,''
-    in \textit{Proc. 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, 2016, pp. 785--794.
+  T. Chen and C. Guestrin, ``XGBoost: A scalable tree boosting system,''
+  in \textit{Proc. 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, 2016, pp. 785--794.
 
   \bibitem{shepard1968}
-    D. Shepard, ``A two-dimensional interpolation function for irregularly-spaced data,''
-    in \textit{Proc. 23rd ACM National Conference}, 1968, pp. 517--524.
+  D. Shepard, ``A two-dimensional interpolation function for irregularly-spaced data,''
+  in \textit{Proc. 23rd ACM National Conference}, 1968, pp. 517--524.
 
   \bibitem{boeing2017osmnx}
-    G. Boeing, ``OSMnx: New methods for acquiring, constructing, analyzing, and visualizing complex street networks,''
-    \textit{Computers, Environment and Urban Systems}, vol. 65, pp. 126--139, 2017.
+  G. Boeing, ``OSMnx: New methods for acquiring, constructing, analyzing, and visualizing complex street networks,''
+  \textit{Computers, Environment and Urban Systems}, vol. 65, pp. 126--139, 2017.
 \end{thebibliography}
 
 \end{document}
