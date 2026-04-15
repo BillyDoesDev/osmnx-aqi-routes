@@ -136,15 +136,15 @@ def train(data_root: str = DATA_ROOT):
     )
 
     model = XGBRegressor(
-        n_estimators=300,
+        n_estimators=200,
         learning_rate=0.05,
-        max_depth=6,
+        max_depth=2,
         subsample=0.8,
         colsample_bytree=0.8,
         random_state=42,
         n_jobs=-1,
     )
-    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=50)
+    model.fit(X_train, y_train, eval_set=[(X_train, y_train), (X_test, y_test)], verbose=50)
 
     preds = model.predict(X_test)
     mae = mean_absolute_error(y_test, preds)
@@ -169,7 +169,8 @@ def train(data_root: str = DATA_ROOT):
 # using the model
 # helpers
 def load_model():
-    payload = joblib.load(MODEL_PATH)
+    # payload = joblib.load(f"{MODEL_PATH}")
+    payload = joblib.load("services/pm25_model.joblib")
     return (
         payload["model"],
         payload["features"],

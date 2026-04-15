@@ -8,9 +8,9 @@ import requests
 from dotenv import load_dotenv
 from pydantic import BaseModel
 import os
-from graph_service import CITY_OSMID
+# from graph_service import CITY_OSMID
 from collections import defaultdict
-from model import N_LAGS
+from services.model import N_LAGS
 
 
 load_dotenv()
@@ -223,16 +223,17 @@ def get_recent_station_readings(city:CityAQI, N_LAGS:int=N_LAGS) -> List[Tuple[i
 # (last 4h) of the CO ppb censor at patia, or say in this example, across Bhubaneswar
 
 if __name__ == "__main__":
-    city = fetch_city_aqi(CITY_OSMID)
+    pass
+    # city = fetch_city_aqi(CITY_OSMID)
 
-    for station_id, station in city.stations.items():
-        print(f"\nFor station {station.name}...")
-        print(f"Available sensors: {list(station.sensors_by_name.keys())}")
+    # for station_id, station in city.stations.items():
+    #     print(f"\nFor station {station.name}...")
+    #     print(f"Available sensors: {list(station.sensors_by_name.keys())}")
 
-        sensor_name = input("Enter sensor of choice: ").strip()
-        target_sensor_id = station.sensors_by_name[sensor_name].id
+    #     sensor_name = input("Enter sensor of choice: ").strip()
+    #     target_sensor_id = station.sensors_by_name[sensor_name].id
 
-        print("Getting readings...")
-        for reading in get_hourly_readings_from_sensor(target_sensor_id):
-            print(reading.datetime.isoformat(), reading.value, reading.units)
+    #     print("Getting readings...")
+    #     for reading in get_hourly_readings_from_sensor(target_sensor_id):
+    #         print(reading.datetime.isoformat(), reading.value, reading.units)
     

@@ -68,6 +68,34 @@ li:hover {
     cursor: pointer;
 }
 
+.navbar {
+    position: fixed;
+    top: 0;
+    background-color: #353d4c57;
+    z-index: 20;
+    width: 100%;
+    backdrop-filter: blur(10px);
+}
+
+.navbar ul {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    place-items: center;
+}
+
+.navbar ul li {
+    opacity: 1;
+}
+
+.spacer {
+    width: 2rem;
+    height: 3rem;
+}
+
+a {
+    color: white;
+}
+
 .map-container {
     width: 90%;
     max-width: 1200px;
@@ -104,4 +132,96 @@ li:hover {
 #route-form button {
     margin-top: 1rem;
     width: 100%;
+}
+
+.routes-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+#hint {
+    opacity: 40%;
+}
+
+#hint:hover {
+    opacity: 100%;
+}
+
+/* range styling, thanks to https://codepen.io/thebabydino/pen/goYYrN */
+/* so fucking annoying */
+[type=range] {
+  --range: calc(var(--max) - var(--min));
+  --ratio: calc((var(--val) - var(--min))/var(--range));
+  --sx: calc(.5*1.5em + var(--ratio)*(100% - 1.5em));
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 1.5em;
+  background: transparent;
+  font: 1em/1 arial, sans-serif;
+  border: none !important;
+}
+[type=range], [type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+}
+[type=range]::-webkit-slider-runnable-track {
+  box-sizing: border-box;
+  border: none;
+  width: 100%;
+  height: 0.25em;
+  background: #ccc;
+}
+.js [type=range]::-webkit-slider-runnable-track {
+  background: linear-gradient(#95a, #95a) 0/var(--sx) 100% no-repeat #ccc;
+}
+[type=range]::-moz-range-track {
+  box-sizing: border-box;
+  border: none;
+  width: 100%;
+  height: 0.25em;
+  background: #ccc;
+}
+[type=range]::-ms-track {
+  box-sizing: border-box;
+  border: none;
+  width: 100%;
+  height: 0.25em;
+  background: #ccc;
+}
+[type=range]::-moz-range-progress {
+  height: 0.25em;
+  background: #95a;
+}
+[type=range]::-ms-fill-lower {
+  height: 0.25em;
+  background: #95a;
+}
+[type=range]::-webkit-slider-thumb {
+  margin-top: -0.625em;
+  box-sizing: border-box;
+  border: none;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: #f90;
+}
+[type=range]::-moz-range-thumb {
+  box-sizing: border-box;
+  border: none;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: #f90;
+}
+[type=range]::-ms-thumb {
+  margin-top: 0;
+  box-sizing: border-box;
+  border: none;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: #f90;
+}
+[type=range]::-ms-tooltip {
+  display: none;
 }

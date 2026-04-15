@@ -14,25 +14,28 @@ from dataclasses import dataclass
 
 import requests
 
-from model import interpolate_pm25_for_nodes, predict_pm25
-from graph_service import CITY_OSMID
-from _open_aq import get_recent_station_readings, fetch_city_aqi
+from services.model import interpolate_pm25_for_nodes, predict_pm25
+# from services.graph_service import get_city_osmid
+from services._open_aq import get_recent_station_readings, fetch_city_aqi
 
 
 DEFAULT_ALPHA = 0.5
 _graph: nx.MultiDiGraph | None = None
-_city = ox.geocoder.geocode_to_gdf(CITY_OSMID, by_osmid=True)
+# _city = ox.geocoder.geocode_to_gdf(get_city_osmid(), by_osmid=True)
 
-print("Loading OSMnx graph for Bhubaneswar...")
-G = ox.graph_from_place(_city.display_name.iloc[0], network_type="drive")
-G = ox.add_edge_speeds(G)
-G = ox.add_edge_travel_times(G)
-_graph = G
-print(f"Graph loaded: {len(G.nodes):,} nodes, {len(G.edges):,} edges.")
+# print("Loading OSMnx graph for Bhubaneswar...")
+# G = ox.graph_from_place(_city.display_name.iloc[0], network_type="drive")
+# G = ox.add_edge_speeds(G)
+# G = ox.add_edge_travel_times(G)
+# _graph = G
+# print(f"Graph loaded: {len(G.nodes):,} nodes, {len(G.edges):,} edges.")
 
 
 def get_graph() -> nx.MultiDiGraph:
     global _graph
+    from services.graph_service import get_city_osmid
+    _city = ox.geocoder.geocode_to_gdf(get_city_osmid(), by_osmid=True)
+
     if _graph is None:
         print("Loading OSMnx graph for Bhubaneswar...")
         G = ox.graph_from_place(_city.display_name.iloc[0], network_type="drive")
@@ -170,6 +173,7 @@ def compute_routes(
     start_coords: tuple[float, float],
     end_coords: tuple[float, float],
     station_predictions: dict[int, float],  # {station_id: predicted_pm25}
+    G: nx.MultiDiGraph,
     alpha: float = DEFAULT_ALPHA,
 ) -> tuple[RouteResult, RouteResult]:
     """
@@ -185,7 +189,7 @@ def compute_routes(
     Returns two RouteResult objects ready for map rendering and
     pollution timeline display.
     """
-    G = get_graph()
+    # G = get_graph()
 
     orig = ox.nearest_nodes(G, start_coords[1], start_coords[0])
     dest = ox.nearest_nodes(G, end_coords[1], end_coords[0])
@@ -350,11 +354,14 @@ def get_directions_for_route(G: nx.MultiDiGraph, node_sequence: list[int]) -> li
 
 
 if __name__ == "__main__":
-    city = fetch_city_aqi(CITY_OSMID)
+    from services.graph_service import get_city_osmid
+
+    city = fetch_city_aqi(get_city_osmid())
     station_preds = {
         station_id: predict_pm25(station_id, station_readings)
         for station_id, station_readings in get_recent_station_readings(city)
     }
+    _G = get_graph()
 
     _orig = ox.geocoder.geocode_to_gdf("kiit campus 6")
     start_coords = _orig["lat"].iloc[0], _orig["lon"].iloc[0]
@@ -362,7 +369,7 @@ if __name__ == "__main__":
     _dest = ox.geocoder.geocode_to_gdf("Master Canteen")
     end_coords = _dest["lat"].iloc[0], _dest["lon"].iloc[0]
 
-    fastest, optimal = compute_routes(start_coords, end_coords, station_preds, alpha=0)
+    fastest, optimal = compute_routes(start_coords, end_coords, station_preds, _G, alpha=0)
     print(f"{fastest.mean_pm25, optimal.mean_pm25 = }")
     print(f"{fastest.total_distance/1e3, fastest.total_time/(60) = }")
     print(f"{optimal.total_distance/1e3, optimal.total_time/(60) = }")

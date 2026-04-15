@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Foliage.{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <script defer src="/static/js/index.js"></script>
+</head>
+
+<body>
+
+    <div class="navbar">
+        <ul>
+            <li><a href="#">Home</a></li>
+            <li><a href="#">Station Stats</a></li>
+            <li><a href="#">Credits</a></li>
+        </ul>
+    </div>
+
+    <div class="spacer"></div>
+
+    {% block content %}
+    {% endblock %}
+
+</body>
+
+</html>
